@@ -4,7 +4,7 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - name: Lấy mã nguồn
         uses: actions/checkout@v4
