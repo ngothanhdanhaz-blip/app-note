@@ -8,24 +8,24 @@ jobs:
     name: 🎉 iOS Build
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           architecture: x64
-      - run: flutter pub get
-      
 
-      - run: pod repo update
-        working-directory: ios
+      - name: Generate iOS folder (if missing)
+        run: flutter create . --platforms=ios
+
+      - run: flutter pub get
 
       - run: flutter build ios --release --no-codesign
 
-      - run: mkdir Payload
+      - run: mkdir -p Payload
         working-directory: build/ios/iphoneos
 
-      - run: mv Runner.app/ Payload
+      - run: mv Runner.app/ Payload/
         working-directory: build/ios/iphoneos
 
       - name: Zip output
@@ -39,4 +39,4 @@ jobs:
           file: build/ios/iphoneos/FlutterIpaExport.ipa
           tag: v1.0
           overwrite: true
-          body: "This is first release"
+          body: "Bản build iOS đầu tiên"
