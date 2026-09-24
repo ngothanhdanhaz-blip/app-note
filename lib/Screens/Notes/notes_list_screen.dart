@@ -19,13 +19,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
   String _selectedTopic = 'Tất cả';
   String _searchQuery = '';
 
-  // Khởi tạo Firebase Service
   final FirebaseService _firebaseService = FirebaseService();
-
-  // --- CÁC BIẾN CHO VÙNG RIÊNG TƯ ---
-  bool _showPrivateOnly = false; // Đang ở chế độ xem riêng tư hay bình thường
-  bool _isAuthenticated = false; // Đã nhập đúng mã PIN chưa
-  final String _correctPin = "1234"; // MÃ PIN MẶC ĐỊNH (Bạn có thể đổi ở đây)
 
   @override
   void dispose() {
@@ -33,94 +27,14 @@ class _NotesListScreenState extends State<NotesListScreen> {
     super.dispose();
   }
 
-  // --- HÀM HIỂN THỊ HỘP THOẠI NHẬP MÃ PIN ---
-  void _showPinDialog() {
-    final pinController = TextEditingController();
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Vùng riêng tư', style: TextStyle(color: Colors.red)),
-        content: TextField(
-          controller: pinController,
-          obscureText: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Nhập mã PIN (Mặc định: 1234)',
-            prefixIcon: Icon(Icons.password),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              if (pinController.text == _correctPin) {
-                Navigator.pop(context);
-                setState(() {
-                  _isAuthenticated = true;
-                  _showPrivateOnly = true;
-                });
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Mã PIN không đúng!'), backgroundColor: Colors.red),
-                );
-              }
-            },
-            child: const Text('Mở khóa', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- HÀM CHUYỂN ĐỔI CHẾ ĐỘ (THƯỜNG <-> RIÊNG TƯ) ---
-  void _togglePrivateZone() {
-    if (_showPrivateOnly) {
-      // Đang ở vùng riêng tư -> Thoát ra ngoài
-      setState(() {
-        _showPrivateOnly = false;
-        _isAuthenticated = false; // Xóa trạng thái đăng nhập để lần sau vào lại phải nhập mã
-      });
-    } else {
-      // Đang ở ngoài -> Bấm vào vùng riêng tư
-      if (!_isAuthenticated) {
-        _showPinDialog();
-      } else {
-        setState(() => _showPrivateOnly = true);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _showPrivateOnly ? 'Vùng riêng tư' : 'Danh sách ghi chú',
-          style: TextStyle(color: _showPrivateOnly ? Colors.red : null, fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        actions: [
-          // NÚT Ổ KHÓA CHUYỂN ĐỔI GIAO DIỆN
-          IconButton(
-            icon: Icon(
-              _showPrivateOnly ? Icons.lock_open : Icons.lock, 
-              color: _showPrivateOnly ? Colors.red : (isDark ? Colors.white : Colors.black87)
-            ),
-            onPressed: _togglePrivateZone,
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Danh sách ghi chú'), elevation: 0),
       body: Column(
         children: [
-          // GIAO DIỆN TÌM KIẾM
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -143,7 +57,6 @@ class _NotesListScreenState extends State<NotesListScreen> {
             ),
           ),
           
-          // GIAO DIỆN LỌC CHỦ ĐỀ
           SizedBox(
             height: 50,
             child: ListView.builder(
@@ -179,7 +92,6 @@ class _NotesListScreenState extends State<NotesListScreen> {
           ),
           const Divider(),
           
-          // DANH SÁCH GHI CHÚ TỪ FIREBASE
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _firebaseService.getNotesStream(),
@@ -201,7 +113,6 @@ class _NotesListScreenState extends State<NotesListScreen> {
                   );
                 }
 
-                // 1. ÉP KIỂU VÀ LỌC DỮ LIỆU LOGIC MỚI
                 final rawNotes = snapshot.data!.docs;
                 final displayNotes = rawNotes.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
@@ -210,12 +121,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
                   final content = (data['content'] ?? '').toString().toLowerCase();
                   final topic = data['topic'] ?? '';
 
-                  // KIỂM TRA ĐIỀU KIỆN RIÊNG TƯ
-                  if (_showPrivateOnly) {
-                    if (!isPrivate) return false; // Ở tab Riêng tư -> Ẩn note thường
-                  } else {
-                    if (isPrivate) return false; // Ở tab Thường -> Ẩn note mật
-                  }
+                  // TAB NÀY CHỈ LẤY GHI CHÚ BÌNH THƯỜNG
+                  if (isPrivate) return false; 
                   
                   final matchTopic = _selectedTopic == 'Tất cả' || topic == _selectedTopic;
                   final matchSearch = title.contains(_searchQuery) || content.contains(_searchQuery);
@@ -224,15 +131,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
                 }).toList();
 
                 if (displayNotes.isEmpty) {
-                  return Center(
-                    child: Text(
-                      _showPrivateOnly ? 'Vùng riêng tư đang trống.' : 'Không tìm thấy ghi chú nào phù hợp.', 
-                      style: const TextStyle(color: Colors.grey)
-                    )
-                  );
+                  return const Center(child: Text('Không tìm thấy ghi chú nào phù hợp.', style: TextStyle(color: Colors.grey)));
                 }
 
-                // 2. HIỂN THỊ UI DANH SÁCH
                 return ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: displayNotes.length,
@@ -248,19 +149,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
                       topic: data['topic'] ?? 'Cá nhân',
                       imagePath: (data['imagePath'] == null || data['imagePath'].toString().isEmpty) ? null : data['imagePath'],
                       url: (data['url'] == null || data['url'].toString().isEmpty) ? null : data['url'],
-                      isPrivate: data['isPrivate'] ?? false,
+                      isPrivate: false,
                     );
 
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      // Đổi màu viền thẻ nếu là ghi chú mật để dễ nhận diện
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                          color: _showPrivateOnly ? Colors.red.withOpacity(0.5) : Colors.transparent,
-                          width: 1
-                        )
-                      ),
                       child: ListTile(
                         onTap: () {
                           Navigator.push(
@@ -272,7 +165,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
                         },
                         leading: note.imagePath != null
                             ? ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.file(File(note.imagePath!), width: 50, height: 50, fit: BoxFit.cover))
-                            : Icon(Icons.description, size: 40, color: _showPrivateOnly ? Colors.red.shade300 : Colors.blueGrey),
+                            : const Icon(Icons.description, size: 40, color: Colors.blueGrey),
                         title: Text(note.title, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

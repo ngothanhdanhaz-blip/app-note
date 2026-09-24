@@ -16,9 +16,11 @@ class FirebaseService {
   }
 
   // 2. Lấy danh sách ghi chú theo thời gian thực (Read Realtime)
-  Stream<QuerySnapshot> getNotesStream() {
-    // Lấy dữ liệu và sắp xếp theo thời gian mới nhất lên đầu
-    return notesCollection.orderBy('createdAt', descending: true).snapshots();
+Stream<QuerySnapshot> getNotesStream() {
+    return FirebaseFirestore.instance
+        .collection('notes')
+        .orderBy('createdAt', descending: true) // Sắp xếp note mới nhất lên đầu
+        .snapshots();
   }
 
   // 3. Xóa ghi chú (Delete)
