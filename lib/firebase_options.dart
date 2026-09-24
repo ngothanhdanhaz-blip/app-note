@@ -23,10 +23,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -62,7 +59,6 @@ class DefaultFirebaseOptions {
     projectId: 'app-note-firebase-v2',
     storageBucket: 'app-note-firebase-v2.firebasestorage.app',
   );
-
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyA5XZ6qKN9dsrAzv_KgFPV6E8yuH7SE3vo',
     appId: '1:1003688998573:web:68e6034203ae0b31af7824',
@@ -70,5 +66,14 @@ class DefaultFirebaseOptions {
     projectId: 'app-note-firebase-v2',
     authDomain: 'app-note-firebase-v2.firebaseapp.com',
     storageBucket: 'app-note-firebase-v2.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyC8SYCZbvXZJQCLBp3_Q3c7_anJ5Ps6N2M',
+    appId: '1:1003688998573:ios:84026d37fddc9109af7824',
+    messagingSenderId: '1003688998573',
+    projectId: 'app-note-firebase-v2',
+    storageBucket: 'app-note-firebase-v2.firebasestorage.app',
+    iosBundleId: 'com.example.demo',
   );
 }
