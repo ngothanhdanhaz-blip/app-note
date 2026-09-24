@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart'; 
 
+// ---- BỔ SUNG THƯ VIỆN FIREBASE ----
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart'; 
+// ------------------------------------
+
 import 'theme_provider.dart';
 import 'package:demo/Screens/Notes/note_provider.dart';
 import 'package:demo/Screens/Notes/Note_editer_screen.dart';
@@ -12,6 +17,13 @@ import 'package:demo/Screens/Settings/Setting_Screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); 
 
+  // ---- KHỞI TẠO FIREBASE ----
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  // ---------------------------
+
+  // Khởi tạo cơ sở dữ liệu cục bộ Hive (Cũ)
   await Hive.initFlutter();
   Hive.registerAdapter(NoteItemAdapter());
   await Hive.openBox<NoteItem>('notes_box');

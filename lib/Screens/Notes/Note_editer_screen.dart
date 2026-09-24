@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
-import 'note_provider.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; // Đã thay thế Provider bằng Firestore
 
 class NoteEditorScreen extends StatefulWidget {
   // Thêm biến nhận vào để truyền tín hiệu chuyển Tab
@@ -27,6 +26,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final ImagePicker _picker = ImagePicker();
   
   bool _isPrivate = false; 
+  bool _isLoading = false; // Thêm cờ trạng thái loading khi đẩy dữ liệu lên mạng
 
   @override
   void dispose() {
@@ -89,47 +89,64 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  void _saveNote() {
+  // Chuyển hàm thành async để đợi phản hồi từ Firebase
+  void _saveNote() async {
     if (_formKey.currentState!.validate()) {
       // 1. HIỆU ỨNG UX: Ẩn bàn phím đi cho mượt trước khi chuyển tab
       FocusScope.of(context).unfocus();
 
-      final newNote = NoteItem(
-        id: DateTime.now().toString(),
-        title: _titleController.text,
-        content: _contentController.text,
-        topic: _selectedTopic ?? 'Cá nhân',
-        imagePath: _selectedImage?.path,
-        url: _urlController.text,
-        isPrivate: _isPrivate,
-      );
+      setState(() => _isLoading = true);
 
-      Provider.of<NoteProvider>(context, listen: false).addNote(newNote);
+      try {
+        // 2. LƯU TRỰC TIẾP LÊN FIREBASE THAY VÌ HIVE/PROVIDER
+        await FirebaseFirestore.instance.collection('notes').add({
+          'title': _titleController.text.trim(),
+          'content': _contentController.text.trim(),
+          'topic': _selectedTopic ?? 'Cá nhân',
+          'url': _urlController.text.trim(),
+          // Lưu ý: path hiện tại chỉ là text đường dẫn trên máy.
+          // Để upload ảnh thật sự lên Cloud, sau này cần dùng thêm Firebase Storage.
+          'imagePath': _selectedImage?.path ?? '', 
+          'isPrivate': _isPrivate,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isPrivate ? 'Đã lưu vào Vùng riêng tư!' : 'Lưu ghi chú thành công!'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating, // Hiệu ứng Snackbar nổi
-        ),
-      );
+        // 3. THÔNG BÁO THÀNH CÔNG
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isPrivate ? 'Đã lưu vào Vùng riêng tư trên Firebase!' : 'Lưu ghi chú Firebase thành công!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
 
-      // Lưu lại trạng thái ghi chú mật trước khi xóa trắng form
-      bool wasPrivate = _isPrivate;
+        // Lưu lại trạng thái ghi chú mật trước khi xóa trắng form
+        bool wasPrivate = _isPrivate;
 
-      _titleController.clear();
-      _contentController.clear();
-      _urlController.clear();
-      setState(() {
-        _selectedImage = null;
-        _selectedTopic = null;
-        _isPrivate = false; 
-      });
+        // 4. RESET FORM & ĐIỀU HƯỚNG
+        _titleController.clear();
+        _contentController.clear();
+        _urlController.clear();
+        setState(() {
+          _selectedImage = null;
+          _selectedTopic = null;
+          _isPrivate = false; 
+          _isLoading = false;
+        });
 
-      // 2. ĐIỀU HƯỚNG THÔNG MINH
-      if (widget.onNavigate != null) {
-        // Nếu là mật -> Đẩy sang Tab 2 (Riêng tư). Nếu thường -> Sang Tab 1 (Danh sách)
-        widget.onNavigate!(wasPrivate ? 2 : 1);
+        if (widget.onNavigate != null) {
+          widget.onNavigate!(wasPrivate ? 2 : 1);
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi lưu lên Firebase: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -140,7 +157,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Tạo ghi chú mới')),
-      body: Padding(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator()) // Hiện vòng quay khi đang lưu mạng
+        : Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
@@ -227,8 +246,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 Container(
                   decoration: BoxDecoration(
                     color: _isPrivate 
-                        ? (isDark ? Colors.red.withOpacity(0.2) : Colors.red.shade50) 
-                        : (isDark ? Colors.grey.shade800 : Colors.grey.shade50), 
+                      ? (isDark ? Colors.red.withOpacity(0.2) : Colors.red.shade50) 
+                      : (isDark ? Colors.grey.shade800 : Colors.grey.shade50), 
                     borderRadius: BorderRadius.circular(8), 
                     border: Border.all(
                         color: _isPrivate 
@@ -248,7 +267,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _saveNote,
+                    onPressed: _isLoading ? null : _saveNote,
                     style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16.0)),
                     child: const Text('LƯU GHI CHÚ', style: TextStyle(fontSize: 16)),
                   ),
